@@ -13,8 +13,8 @@ Drehbare 3D-Ansicht mit allen Bauteilen: `vorschau_3d.html` im Browser öffnen.
   gleicher Höhe, damit man sie gut mit den Daumen erreicht.
 - **Select/Start** sitzen mittig unter dem Display.
 - **Lautsprecher** auf der **Vorderseite** unten links, mit Lochgitter im Deckel.
-- **Batterien (4x AA)** liegen in den beiden Griffen unter der Platine. Rippen im Boden halten zwei
-  2xAA-Halter fest.
+- **Batterien (4x AA)** liegen rund in den beiden Griffen unter der Platine, je zwei pro Seite.
+  Kleine Mulden im Boden halten sie fest.
 - **Gehäuse** aus Ober- und Unterschale, verschraubt mit 4x M2.5. Eine Öffnung für einen Ein/Aus-Schiebeschalter ist schon drin.
 
 ## Dateien (`stl/`)
@@ -43,6 +43,6 @@ Die Maße habe ich aus deinem Bild geschätzt. Wenn deine Teile anders groß sin
 - ESP32 DevKit 28 x 55 mm
 - Taster 6 x 6 mm, **12 mm hoch** (damit sie durch den 2 mm dicken Deckel ragen)
 - Lautsprecher Ø 28 mm
-- 2xAA-Batteriehalter 32 x 58 mm
+- AA-Batterien Ø 14.5 x 50.5 mm
 
 Hinweis: 4x AA ergeben etwa 6 V. Das geht am **VIN**-Pin des ESP32, aber **nicht** am 3.3-V-Pin!

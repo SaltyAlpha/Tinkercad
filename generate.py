@@ -40,8 +40,10 @@ USB_CUTOUT = 12                          # Schlitzbreite in der Rückwand
 
 SWITCH_POS_X, SWITCH_CUTOUT = 40, (9, 4.5)
 
-BATTERY_BOX = (32, 58)                   # 2x AA-Halter pro Seite
-BATTERY_POS = [(-61, 0), (61, 0)]
+BATTERY_D, BATTERY_L = 14.5, 50.5        # AA-Batterie, liegt längs in Y-Richtung
+BATTERY_X = [-68.8, -53.2, 53.2, 68.8]   # je zwei Batterien pro Griff
+BATTERY_Z = PLATE + 0.5 + BATTERY_D / 2  # Mitte der Batterie
+CRADLE_Y = [-17, 17]                     # zwei Mulden pro Batterie
 
 POSTS = [(sx * 36, sy * 31) for sx in (-1, 1) for sy in (-1, 1)]
 POST_D, SCREW_D = 6.0, 2.2               # M2.5-Schrauben
@@ -58,6 +60,11 @@ def box(w, d, h, x=0, y=0, z=0):
 
 def cyl(d, h, x=0, y=0, z=0):
     return m.Manifold.cylinder(h, d / 2, d / 2).translate((x, y, z))
+
+
+def battery(d, x, length=BATTERY_L):
+    """Liegender Zylinder in Y-Richtung, mittig auf Batteriehöhe."""
+    return cyl(d, length).rotate((90, 0, 0)).translate((x, length / 2, BATTERY_Z))
 
 
 def button_positions(cx, cy):
@@ -80,10 +87,11 @@ def bottom_shell():
     for x, y in POSTS:
         part += cyl(POST_D, PCB_Z, x, y)
         part -= cyl(SCREW_D, PCB_Z, x, y, PLATE)
-    # Führungsrippen für die Batteriehalter
-    for x, y in BATTERY_POS:
-        w, d = BATTERY_BOX
-        part += box(w + 2.4, d + 2.4, 4, x, y, PLATE) - box(w, d, 4, x, y, PLATE)
+    # Mulden, in denen die runden Batterien liegen
+    for x in BATTERY_X:
+        for y in CRADLE_Y:
+            cradle = box(BATTERY_D + 2.5, 6, BATTERY_Z - PLATE, x, y, PLATE)
+            part += cradle - battery(BATTERY_D + 0.6, x)
     # USB-Ausschnitt in der Rückwand (oberer Rand)
     # ESP32 hängt kopfüber an Buchsenleisten unter der Platine -> USB sitzt tief
     part -= box(USB_CUTOUT, 10, BOTTOM_H, ESP32_POS[0], CASE_D / 2, 4)
@@ -155,16 +163,14 @@ def components():
     parts["ESP32-Modul"] = (box(18, 25, 3, ex, ey - ed / 2 + 13, board_z - 3)
                             + box(8, 6, 3, ex, ey + ed / 2 - 2, board_z - 3), "#c9ced6")
 
-    # Batterien in den Griffen
-    holders = m.Manifold()
+    # 4 runde AA-Batterien in den Griffen, Pluspol nach hinten
     cells = m.Manifold()
-    bw, bd = BATTERY_BOX
-    for x, y in BATTERY_POS:
-        holders += box(bw, bd, 14, x, y, PLATE) - box(bw - 2, bd - 4, 14, x, y, PLATE + 1.2)
-        for sx in (-1, 1):
-            cells += cyl(14.5, 50.5).rotate((90, 0, 0)).translate((x + sx * 7.8, y + 25.25, PLATE + 1.2 + 7.25))
-    parts["Batteriehalter"] = (holders, "#1f1f1f")
+    poles = m.Manifold()
+    for x in BATTERY_X:
+        cells += battery(BATTERY_D, x, BATTERY_L - 1.5).translate((0, -0.75, 0))
+        poles += cyl(5.5, 1.5).rotate((-90, 0, 0)).translate((x, BATTERY_L / 2 - 1.5, BATTERY_Z))
     parts["Batterien AA"] = (cells, "#4caf6a")
+    parts["Batteriepole"] = (poles, "#c9ced6")
     parts["Schalter"] = (box(SWITCH_CUTOUT[0] + 3, 5, 4.5, SWITCH_POS_X, CASE_D / 2 - WALL - 2.5,
                              PCB_Z - 7.5), "#555555")
     return parts
@@ -184,7 +190,7 @@ def viewer_html(path):
         mesh_json(pcb(), "#2e7d4f", "platine", "Platine", PCB_Z),
         mesh_json(top_shell(), "#3b6fd1", "oben", "Gehäuse oben", BOTTOM_H),
     ]
-    in_bottom = {"Batteriehalter", "Batterien AA", "Schalter"}
+    in_bottom = {"Batterien AA", "Batteriepole", "Schalter"}
     for name, (part, color) in components().items():
         meshes.append(mesh_json(part, color, "unten" if name in in_bottom else "platine", name))
     template = (Path(__file__).parent / "viewer_template.html").read_text()
@@ -219,10 +225,9 @@ def layout_png(path):
                                ls=ls, alpha=alpha))
         ax.text(pos[0], pos[1] + label_dy, label, ha="center", va="center", fontsize=9, weight="bold")
 
-    for pos in BATTERY_POS:
-        rect(BATTERY_BOX, pos, "#9fb7a8", "", ls="--", alpha=0.5)
-        ax.text(pos[0] + np.sign(pos[0]) * 9, pos[1] - 4.5, "2x AA", ha="center", va="center", fontsize=8,
-                style="italic", color="#2f5040")
+    for x in BATTERY_X:
+        ax.add_patch(FancyBboxPatch((x - BATTERY_D / 2 + 3, -BATTERY_L / 2 + 3), BATTERY_D - 6, BATTERY_L - 6,
+                                    boxstyle="round,pad=3", fc="#8fc79f", ec="#2f5040", ls="--", alpha=0.6))
     rect(ESP32_SIZE, ESP32_POS, "#5aa9e6", "", ls="--", alpha=0.5)
     ax.text(ESP32_POS[0], ESP32_POS[1] - 22, "ESP32\n(Rückseite)", ha="center", fontsize=8)
     rect(DISPLAY_MODULE, DISPLAY_POS, "#d9534f", "Display", alpha=0.85)
@@ -247,7 +252,7 @@ def layout_png(path):
     ax.set_xticks(range(-80, 81, 10))
     ax.set_yticks(range(-40, 41, 10))
     ax.grid(alpha=0.3)
-    ax.set_title("Neues Layout – Draufsicht (Maße in mm, Mitte = 0|0)")
+    ax.set_title("Neues Layout – Draufsicht (Maße in mm, Mitte = 0|0) · grün gestrichelt = 4x AA unter der Platine")
     fig.tight_layout()
     fig.savefig(path, dpi=130)
 
