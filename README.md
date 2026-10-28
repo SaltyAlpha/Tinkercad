@@ -3,14 +3,16 @@
 ![Layout](layout.png)
 ![Vorschau](vorschau.png)
 
+Drehbare 3D-Ansicht mit allen Bauteilen: `vorschau_3d.html` im Browser öffnen.
+
 ## Was ist neu?
 
 - **Display in der Mitte.** Vorher lag der ESP32 halb auf dem Display. Jetzt sitzt der ESP32 kopfüber
-  **unter** dem Display, mit dem USB-Anschluss zur Rückseite. So bleibt er zum Programmieren erreichbar.
+  auf der **Rückseite** der Platine unter dem Display, mit dem USB-Anschluss zur Rückseite. So bleibt er zum Programmieren erreichbar.
 - **Steuerkreuz links, A/B/X/Y rechts.** Die Tasten sind jeweils 10 mm auseinander und liegen auf
   gleicher Höhe, damit man sie gut mit den Daumen erreicht.
 - **Select/Start** sitzen mittig unter dem Display.
-- **Lautsprecher** unten links mit Lochgitter im Deckel.
+- **Lautsprecher** auf der **Vorderseite** unten links, mit Lochgitter im Deckel.
 - **Batterien (4x AA)** liegen in den beiden Griffen unter der Platine. Rippen im Boden halten zwei
   2xAA-Halter fest.
 - **Gehäuse** aus Ober- und Unterschale, verschraubt mit 4x M2.5. Eine Öffnung für einen Ein/Aus-Schiebeschalter ist schon drin.

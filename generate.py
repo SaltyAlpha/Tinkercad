@@ -1,8 +1,9 @@
 """Erzeugt Gehäuse, Platine und Layout-Plan für die ESP32-Handheld-Konsole.
 
 Alle Maße in mm. Ursprung = Mitte des Gehäuses, Z = 0 = Unterseite.
-Aufruf: python3 generate.py  ->  schreibt stl/*.stl und layout.png
+Aufruf: python3 generate.py  ->  schreibt stl/*.stl, layout.png und vorschau_3d.html
 """
+import json
 from pathlib import Path
 
 import manifold3d as m
@@ -120,6 +121,77 @@ def pcb():
     return part
 
 
+# ---------------------------------------------------------------- Bauteile (nur für die 3D-Vorschau)
+# Z-Werte gelten im zusammengebauten Gerät: Unterschale ab 0, Platine ab PCB_Z, Oberschale ab BOTTOM_H.
+def components():
+    pcb_top = PCB_Z + PCB_T
+    parts = {}
+
+    # Vorderseite der Platine
+    dw, dd = DISPLAY_MODULE
+    ww, wd = DISPLAY_WINDOW
+    parts["Display"] = (box(dw, dd, 1.6, *DISPLAY_POS, pcb_top + 2.8)
+                        + box(ww, wd, 1.4, *DISPLAY_POS, pcb_top + 4.4), "#d64545")
+    body = m.Manifold()
+    stem = m.Manifold()
+    for x, y in ALL_BUTTONS:
+        body += box(6, 6, 3.5, x, y, pcb_top)
+        stem += cyl(3.5, 12 - 3.5, x, y, pcb_top + 3.5)
+    parts["Taster"] = (body, "#2b2b2b")
+    parts["Tasterknöpfe"] = (stem, "#e9e3d5")
+    parts["Lautsprecher"] = (cyl(SPEAKER_D, 4.5, *SPEAKER_POS, pcb_top)
+                             - cyl(SPEAKER_D - 6, 1, *SPEAKER_POS, pcb_top + 3.5), "#f0913a")
+
+    # Rückseite der Platine: ESP32 hängt kopfüber an zwei Buchsenleisten
+    ex, ey = ESP32_POS
+    ew, ed = ESP32_SIZE
+    header_h = 8.5
+    board_z = PCB_Z - header_h - 1.6
+    headers = m.Manifold()
+    for sx in (-1, 1):
+        headers += box(2.6, 38, header_h, ex + sx * 11.5, ey - 4, PCB_Z - header_h)
+    parts["Buchsenleisten"] = (headers, "#3a3a3a")
+    parts["ESP32"] = (box(ew, ed, 1.6, ex, ey, board_z), "#2f7fd1")
+    parts["ESP32-Modul"] = (box(18, 25, 3, ex, ey - ed / 2 + 13, board_z - 3)
+                            + box(8, 6, 3, ex, ey + ed / 2 - 2, board_z - 3), "#c9ced6")
+
+    # Batterien in den Griffen
+    holders = m.Manifold()
+    cells = m.Manifold()
+    bw, bd = BATTERY_BOX
+    for x, y in BATTERY_POS:
+        holders += box(bw, bd, 14, x, y, PLATE) - box(bw - 2, bd - 4, 14, x, y, PLATE + 1.2)
+        for sx in (-1, 1):
+            cells += cyl(14.5, 50.5).rotate((90, 0, 0)).translate((x + sx * 7.8, y + 25.25, PLATE + 1.2 + 7.25))
+    parts["Batteriehalter"] = (holders, "#1f1f1f")
+    parts["Batterien AA"] = (cells, "#4caf6a")
+    parts["Schalter"] = (box(SWITCH_CUTOUT[0] + 3, 5, 4.5, SWITCH_POS_X, CASE_D / 2 - WALL - 2.5,
+                             PCB_Z - 7.5), "#555555")
+    return parts
+
+
+def mesh_json(part, color, group, name, z=0.0):
+    mesh = part.to_mesh()
+    verts = mesh.vert_properties[:, :3].copy()
+    verts[:, 2] += z
+    return {"name": name, "group": group, "color": color,
+            "pos": np.round(verts, 2).ravel().tolist(), "idx": mesh.tri_verts.ravel().tolist()}
+
+
+def viewer_html(path):
+    meshes = [
+        mesh_json(bottom_shell(), "#7d8b99", "unten", "Gehäuse unten"),
+        mesh_json(pcb(), "#2e7d4f", "platine", "Platine", PCB_Z),
+        mesh_json(top_shell(), "#3b6fd1", "oben", "Gehäuse oben", BOTTOM_H),
+    ]
+    in_bottom = {"Batteriehalter", "Batterien AA", "Schalter"}
+    for name, (part, color) in components().items():
+        meshes.append(mesh_json(part, color, "unten" if name in in_bottom else "platine", name))
+    template = (Path(__file__).parent / "viewer_template.html").read_text()
+    path.write_text(template.replace("/*MODELL*/[]", json.dumps(meshes, separators=(",", ":"))))
+    print(f"{path.name:22s} {path.stat().st_size / 1e6:.1f} MB")
+
+
 def save(part, name):
     mesh = part.to_mesh()
     tm = trimesh.Trimesh(mesh.vert_properties[:, :3], mesh.tri_verts)
@@ -152,7 +224,7 @@ def layout_png(path):
         ax.text(pos[0] + np.sign(pos[0]) * 9, pos[1] - 4.5, "2x AA", ha="center", va="center", fontsize=8,
                 style="italic", color="#2f5040")
     rect(ESP32_SIZE, ESP32_POS, "#5aa9e6", "", ls="--", alpha=0.5)
-    ax.text(ESP32_POS[0], ESP32_POS[1] - 22, "ESP32\n(unter Display)", ha="center", fontsize=8)
+    ax.text(ESP32_POS[0], ESP32_POS[1] - 22, "ESP32\n(Rückseite)", ha="center", fontsize=8)
     rect(DISPLAY_MODULE, DISPLAY_POS, "#d9534f", "Display", alpha=0.85)
     ax.add_patch(Circle(SPEAKER_POS, SPEAKER_D / 2, fc="#f0a050", ec="#333"))
     ax.text(*SPEAKER_POS, "Lautsprecher", ha="center", va="center", fontsize=8, weight="bold")
@@ -186,3 +258,4 @@ if __name__ == "__main__":
     save(top_shell(), "gehaeuse_oben.stl")
     save(pcb(), "platine.stl")
     layout_png(Path(__file__).parent / "layout.png")
+    viewer_html(Path(__file__).parent / "vorschau_3d.html")
